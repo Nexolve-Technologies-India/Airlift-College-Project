@@ -1,4 +1,3 @@
-// File: ChatBot.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Mic } from 'lucide-react';
 import chatbotService from '../apiService';

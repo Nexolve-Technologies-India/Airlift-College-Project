@@ -2,8 +2,12 @@ import express, { Request, Response } from 'express';
 import ChatSession from '../models/ChatSession';
 import Flight from '../models/flight';
 import Booking from '../models/booking';
+import NLPService from '../services/nlpService';
+import IntentClassifier from '../utils/intentClassifier';
 
 const router = express.Router();
+const nlpService = NLPService.getInstance();
+const intentClassifier = IntentClassifier.getInstance();
 
 type Step =
   | 'initial'
@@ -50,6 +54,8 @@ interface SessionContext {
   flights?: FlightData[];
   selectedFlight?: FlightData;
   passengerDetails?: PassengerDetails;
+  intent?: string;
+  entities?: any[];
 }
 
 const generateSeatNumber = (): string => {
@@ -71,20 +77,24 @@ router.post('/message', async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
+    // Process message with NLP
+    const nlpResponse = await nlpService.processMessage(message);
+    const intentMatch = intentClassifier.classifyIntent(message);
+
     let session;
     
-    // Only try to find existing session if sessionId is provided and valid
     if (sessionId && sessionId.match(/^[0-9a-fA-F]{24}$/)) {
       session = await ChatSession.findById(sessionId);
     }
     
-    // Create new session if none exists or no valid sessionId provided
     if (!session) {
       session = new ChatSession({
         context: {
           step: 'initial',
           paymentStatus: 'pending',
           passengerDetails: {},
+          intent: intentMatch.intent,
+          entities: nlpResponse.entities
         },
       });
     }
@@ -125,31 +135,41 @@ router.post('/message', async (req: Request, res: Response): Promise<void> => {
         phone: nullToUndefined(session.context.passengerDetails.phone),
         address: nullToUndefined(session.context.passengerDetails.address)
       } : undefined,
+      intent: intentMatch.intent,
+      entities: nlpResponse.entities
     };
 
     let response = '';
     console.log('Current Step:', context.step);
+    console.log('Detected Intent:', intentMatch.intent);
 
     switch (context.step) {
       case 'initial':
-        response = 'Yes Sure! Where are you departing from?';
+        if (intentMatch.intent === 'greeting') {
+          response = 'Hello! Welcome to SkyWings Airlines. Where are you departing from?';
+        } else {
+          response = 'Where are you departing from?';
+        }
         context.step = 'departure';
         break;
 
       case 'departure':
-        context.from = message;
+        const locationEntity = nlpResponse.entities.find(e => e.type === 'location');
+        context.from = locationEntity ? locationEntity.value : message;
         response = 'Got it! Where are you flying to?';
         context.step = 'destination';
         break;
 
       case 'destination':
-        context.to = message;
+        const toLocationEntity = nlpResponse.entities.find(e => e.type === 'location');
+        context.to = toLocationEntity ? toLocationEntity.value : message;
         response = 'Great! What date are you planning to travel? (YYYY-MM-DD)';
         context.step = 'date';
         break;
 
       case 'date':
-        context.date = message;
+        const dateEntity = nlpResponse.entities.find(e => e.type === 'date');
+        context.date = dateEntity ? dateEntity.value : message;
         const flights = await Flight.find({
           from: context.from,
           to: context.to,
@@ -172,7 +192,7 @@ router.post('/message', async (req: Request, res: Response): Promise<void> => {
           
           response = 'Here are the available flights:\n';
           context.flights.forEach((flight, index) => {
-            response += `${index + 1}. ${flight.airline} - Flight ${flight.flightNumber} - $${flight.price} - ${flight.departureTime}\n`;
+            response += `${index + 1}. ${flight.airline} - Flight ${flight.flightNumber} - ₹${flight.price} - ${flight.departureTime}\n`;
           });
           response += 'Please type the number of the flight you want to book.';
           context.step = 'selecting_flight';
@@ -229,7 +249,6 @@ router.post('/message', async (req: Request, res: Response): Promise<void> => {
           context.step = 'payment';
 
           try {
-            // Find the original flight document
             const flight = await Flight.findOne({
               flightNumber: context.selectedFlight.flightNumber
             });
@@ -263,13 +282,27 @@ router.post('/message', async (req: Request, res: Response): Promise<void> => {
         break;
 
       default:
-        response = 'Sorry, I did not understand that. How can I help you?';
-        context.step = 'initial';
+        if (intentMatch.intent === 'farewell') {
+          response = 'Thank you for choosing SkyWings Airlines. Have a great day!';
+        } else {
+          response = 'Sorry, I did not understand that. How can I help you?';
+          context.step = 'initial';
+        }
     }
 
     // Update session messages and context
-    session.messages.push({ content: message, sender: 'user' });
-    session.messages.push({ content: response, sender: 'bot' });
+    session.messages.push({ 
+      content: message, 
+      sender: 'user',
+      timestamp: new Date()
+    });
+
+    session.messages.push({ 
+      content: response, 
+      sender: 'bot',
+      timestamp: new Date()
+    });
+
     session.context = context as any;
     await session.save();
 

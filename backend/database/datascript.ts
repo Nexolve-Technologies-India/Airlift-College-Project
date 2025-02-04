@@ -41,10 +41,22 @@ const generateFlights = () => {
     { from: 'Delhi', to: 'Mumbai' },
     { from: 'Mumbai', to: 'Bangalore' },
     { from: 'Bangalore', to: 'Mumbai' },
+    { from: 'Chennai', to: 'Mumbai' },
+    { from: 'Mumbai', to: 'Chennai' },
+    { from: 'Kolkata', to: 'Mumbai' },
+    { from: 'Mumbai', to: 'Kolkata' },
+    { from: 'Delhi', to: 'Bangalore' },
+    { from: 'Bangalore', to: 'Delhi' },
+    { from: 'Mumbai', to: 'Hyderabad' },
+    { from: 'Hyderabad', to: 'Mumbai' },
+    { from: 'Kolkata', to: 'Delhi' },
+    { from: 'Delhi', to: 'Kolkata' },
+    { from: 'Delhi', to: 'Hyderabad' },
+    { from: 'Hyderabad', to: 'Delhi' },
   ];
 
   const startDate = new Date('2025-01-01');
-  const endDate = new Date('2025-01-31');
+  const endDate = new Date('2026-01-01');
 
   let flightCounter = 100; // Starting flight number
 
@@ -61,6 +73,70 @@ const generateFlights = () => {
           route.to,
           '08:00',
           '10:30',
+          '2h 30m',
+          5000,
+          100,
+          dateString
+        )
+      );
+      flightCounter++;
+
+      flights.push(
+        generateFlight(
+          airline,
+          `SW${flightCounter}`,
+          route.from,
+          route.to,
+          '10:00',
+          '12:30',
+          '2h 30m',
+          5000,
+          100,
+          dateString
+        )
+      );
+      flightCounter++;
+
+      flights.push(
+        generateFlight(
+          airline,
+          `SW${flightCounter}`,
+          route.from,
+          route.to,
+          '12:00',
+          '14:30',
+          '2h 30m',
+          5000,
+          100,
+          dateString
+        )
+      );
+      flightCounter++;
+
+      flights.push(
+        generateFlight(
+          airline,
+          `SW${flightCounter}`,
+          route.from,
+          route.to,
+          '14:00',
+          '16:30',
+          '2h 30m',
+          5000,
+          100,
+          dateString
+        )
+      );
+      flightCounter++;
+
+      flights.push(
+        generateFlight(
+          airline,
+          `SW${flightCounter}`,
+          route.from,
+          route.to,
+          '16:00',
+          '18:30',
           '2h 30m',
           5000,
           100,

@@ -9,24 +9,68 @@ import flightRoutes from './routes/flightRoutes';
 import bookingRoutes from './routes/bookingRoutes';
 import chatbotRoutes from './routes/chatbotRoutes';
 
+// Import NLP services
+import NLPService from './services/nlpService';
+import IntentClassifier from './utils/intentClassifier';
+import nlpConfig from './config/nlpConfig';
+
 dotenv.config();
 
 const app = express();
+
+// Initialize NLP services
+const initializeNLPServices = () => {
+  try {
+    NLPService.getInstance();
+    IntentClassifier.getInstance();
+    console.log('NLP services initialized successfully');
+  } catch (error) {
+    console.error('Error initializing NLP services:', error);
+  }
+};
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+// Custom middleware for chatbot route logging
+app.use('/api/chatbot', (_req, _res, next) => {
+  console.log(`Chatbot Request - ${new Date().toISOString()}`);
+  next();
+});
+
+// Error handling middleware
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
+});
+
 // Routes
 app.use('/api/flights', flightRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 
+// Health check endpoint
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    nlpStatus: 'initialized',
+    supportedCities: nlpConfig.cities,
+    flightTimings: nlpConfig.flightPatterns.departureTimes
+  });
+});
+
 // Database connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/FlightDB')
   .then(() => {
     console.log('Connected to MongoDB');
+    // Initialize NLP services after database connection
+    initializeNLPServices();
   })
   .catch((error) => {
     console.error('MongoDB connection error:', error);
@@ -36,6 +80,9 @@ const PORT = process.env.PORT || 5500;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log('Environment:', process.env.NODE_ENV || 'development');
+  console.log('Supported Cities:', nlpConfig.cities);
+  console.log('Flight Timings:', nlpConfig.flightPatterns.departureTimes);
 });
 
 export default app;

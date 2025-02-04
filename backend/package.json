@@ -21,6 +21,7 @@
   "dependencies": {
     "@types/cors": "^2.8.17",
     "@types/morgan": "^1.9.9",
+    "@types/natural": "^5.1.5",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
