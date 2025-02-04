@@ -4,6 +4,29 @@ import Flight from '../models/flight';
 // Connect to MongoDB
 mongoose.connect('mongodb://localhost:8848/FlightDB');
 
+// Function to get random element from array
+const getRandomElement = <T>(array: T[]): T => {
+  return array[Math.floor(Math.random() * array.length)];
+};
+
+// Function to generate all hours of the day (00:00 to 23:00)
+const generateHourlyTimes = (): string[] => {
+  return Array.from({ length: 24 }, (_, i) => 
+    `${String(i).padStart(2, '0')}:00`
+  );
+};
+
+// Function to calculate arrival time based on departure time and duration
+const calculateArrivalTime = (departureTime: string, durationHours: number): string => {
+  const [hours, minutes] = departureTime.split(':').map(Number);
+  const totalMinutes = hours * 60 + minutes + durationHours * 60;
+  
+  const newHours = Math.floor(totalMinutes / 60) % 24;
+  const newMinutes = totalMinutes % 60;
+  
+  return `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+};
+
 // Function to generate a single flight object
 const generateFlight = (
   airline: string,
@@ -11,12 +34,18 @@ const generateFlight = (
   from: string,
   to: string,
   departureTime: string,
-  arrivalTime: string,
-  duration: string,
-  price: number,
-  seatsAvailable: number,
   date: string
 ) => {
+  // Possible durations in hours
+  const possibleDurations = [2, 2.5, 3];
+  const durationHours = getRandomElement(possibleDurations);
+  
+  // Calculate arrival time based on departure time and duration
+  const arrivalTime = calculateArrivalTime(departureTime, durationHours);
+  
+  // Possible prices
+  const possiblePrices = [3000, 4000, 5000, 6000, 7000];
+  
   return {
     airline,
     flightNumber,
@@ -24,9 +53,9 @@ const generateFlight = (
     to,
     departureTime,
     arrivalTime,
-    duration,
-    price,
-    seatsAvailable,
+    duration: `${durationHours}h ${durationHours % 1 ? '30m' : '0m'}`,
+    price: getRandomElement(possiblePrices),
+    seatsAvailable: 100,
     date,
     status: 'scheduled',
   };
@@ -57,6 +86,7 @@ const generateFlights = () => {
 
   const startDate = new Date('2025-01-01');
   const endDate = new Date('2026-01-01');
+  const hourlyDepartures = generateHourlyTimes();
 
   let flightCounter = 100; // Starting flight number
 
@@ -64,103 +94,20 @@ const generateFlights = () => {
     const dateString = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
 
     routes.forEach((route) => {
-      // Morning flight
-      flights.push(
-        generateFlight(
-          airline,
-          `SW${flightCounter}`,
-          route.from,
-          route.to,
-          '08:00',
-          '10:30',
-          '2h 30m',
-          5000,
-          100,
-          dateString
-        )
-      );
-      flightCounter++;
-
-      flights.push(
-        generateFlight(
-          airline,
-          `SW${flightCounter}`,
-          route.from,
-          route.to,
-          '10:00',
-          '12:30',
-          '2h 30m',
-          5000,
-          100,
-          dateString
-        )
-      );
-      flightCounter++;
-
-      flights.push(
-        generateFlight(
-          airline,
-          `SW${flightCounter}`,
-          route.from,
-          route.to,
-          '12:00',
-          '14:30',
-          '2h 30m',
-          5000,
-          100,
-          dateString
-        )
-      );
-      flightCounter++;
-
-      flights.push(
-        generateFlight(
-          airline,
-          `SW${flightCounter}`,
-          route.from,
-          route.to,
-          '14:00',
-          '16:30',
-          '2h 30m',
-          5000,
-          100,
-          dateString
-        )
-      );
-      flightCounter++;
-
-      flights.push(
-        generateFlight(
-          airline,
-          `SW${flightCounter}`,
-          route.from,
-          route.to,
-          '16:00',
-          '18:30',
-          '2h 30m',
-          5000,
-          100,
-          dateString
-        )
-      );
-      flightCounter++;
-
-      // Evening flight
-      flights.push(
-        generateFlight(
-          airline,
-          `SW${flightCounter}`,
-          route.from,
-          route.to,
-          '18:00',
-          '20:30',
-          '2h 30m',
-          5000,
-          100,
-          dateString
-        )
-      );
-      flightCounter++;
+      // Generate flights for each hour
+      hourlyDepartures.forEach((departureTime) => {
+        flights.push(
+          generateFlight(
+            airline,
+            `SW${flightCounter}`,
+            route.from,
+            route.to,
+            departureTime,
+            dateString
+          )
+        );
+        flightCounter++;
+      });
     });
   }
 
@@ -193,6 +140,5 @@ const seedFlights = async () => {
 
 // Run the seeding function
 seedFlights();
-
 
 //Run code by command - npx ts-node datascript.ts
