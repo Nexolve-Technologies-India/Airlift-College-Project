@@ -8,6 +8,12 @@ import dotenv from 'dotenv';
 import flightRoutes from './routes/flightRoutes';
 import bookingRoutes from './routes/bookingRoutes';
 import chatbotRoutes from './routes/chatbotRoutes';
+import userRoutes from './routes/userRoutes';
+import feedbackRoutes from './routes/feedbackRoutes';
+import recommendationRoutes from './routes/recommendationRoutes';
+import alertRoutes from './routes/alertRoutes';
+import behaviorRoutes from './routes/behaviorRoutes';
+import loyaltyRoutes from './routes/loyaltyRoutes';
 
 // Import NLP services
 import NLPService from './services/nlpService';
@@ -53,6 +59,12 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 app.use('/api/flights', flightRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/recommendations', recommendationRoutes);
+app.use('/api/alerts', alertRoutes);
+app.use('/api/behavior', behaviorRoutes);
+app.use('/api/loyalty', loyaltyRoutes);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {

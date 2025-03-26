@@ -10,6 +10,8 @@ import SearchResults from './pages/SearchResults';
 import Booking from './pages/Booking';
 import Payment from './pages/Payment';
 import Ticket from './pages/Ticket';
+import Recommendations from './pages/Recommendations';
+
 import ChatBot from './components/ChatBot';
 
 // Define the Layout component with TypeScript
@@ -22,7 +24,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="flex flex-col min-h-screen">
       <Navbar />
       <main className="flex-grow">{children}</main>
-      <Footer />
       <ChatBot />
     </div>
   );
@@ -40,6 +41,7 @@ function App() {
           <Route path="/search" element={<SearchResults />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/payment" element={<Payment />} />
+          <Route path="/recommendations" element={<Recommendations />} />
           <Route path="/ticket" element={<Ticket />} />
         </Routes>
       </Layout>

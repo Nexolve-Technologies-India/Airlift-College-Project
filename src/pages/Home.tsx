@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Plane, Shield, Clock, Star, Phone, Mail, MapPinIcon } from 'lucide-react';
-import { flightService } from '../apiService';
+import { flightService, userService } from '../apiService';
+import RecentlyViewedFlights from '../components/RecentlyViewedFlights';
+import PersonalizedRecommendations from '../components/PersonalizedRecommendations';
+import LoyaltyBenefits from '../components/LoyaltyBenefits';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -11,10 +14,23 @@ const Home: React.FC = () => {
     date: '',
     passengers: '1',
   });
+  const [userEmail, setUserEmail] = useState<string>('');
+
+  useEffect(() => {
+    // In a real app, you'd get this from auth service
+    // For this demo, we'll use localStorage or a default value
+    const email = localStorage.getItem('userEmail') || 'demo@example.com';
+    setUserEmail(email);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Track search if we have an email
+      if (userEmail) {
+        userService.trackSearch(userEmail, formData.from, formData.to, formData.date);
+      }
+      
       const flights = await flightService.search(formData.from, formData.to, formData.date);
       navigate('/search', { state: { flights, ...formData } });
     } catch (error) {
@@ -114,6 +130,14 @@ const Home: React.FC = () => {
             </button>
           </form>
         </div>
+      </div>
+
+      {/* Personalized Sections */}
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        {/* Add the personalized components */}
+        <PersonalizedRecommendations email={userEmail} />
+        <RecentlyViewedFlights email={userEmail} />
+        <LoyaltyBenefits email={userEmail} />
       </div>
 
       {/* Features Section */}

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { Plane, User, Phone, Mail, MapPin } from 'lucide-react';
+import { Plane, User, Phone, Mail, MapPin, Award } from 'lucide-react';
 import { Flight } from '../apiService';
+import FeedbackForm from '../components/FeedbackForm';
 
 interface PassengerDetails {
   name: string;
@@ -10,9 +11,19 @@ interface PassengerDetails {
   address: string;
 }
 
+interface LoyaltyResult {
+  pointsAdded: number;
+  totalPoints: number;
+  tier: string;
+}
+
 const Ticket: React.FC = () => {
   const location = useLocation();
-  const { flight, passenger } = location.state as { flight: Flight; passenger: PassengerDetails };
+  const { flight, passenger, loyaltyResult } = location.state as { 
+    flight: Flight; 
+    passenger: PassengerDetails;
+    loyaltyResult?: LoyaltyResult;
+  };
 
   const handleDownloadTicket = () => {
     // Implement ticket download logic
@@ -31,6 +42,21 @@ const Ticket: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Show loyalty points earned */}
+        {loyaltyResult && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 flex items-center">
+            <Award className="text-blue-600 mr-2" />
+            <div>
+              <p className="font-semibold">
+                Congratulations! You earned {loyaltyResult.pointsAdded} loyalty points.
+              </p>
+              <p className="text-sm text-blue-700">
+                You now have {loyaltyResult.totalPoints} total points ({loyaltyResult.tier} tier).
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-8">
           <div>
@@ -93,6 +119,15 @@ const Ticket: React.FC = () => {
             Download Ticket
           </button>
         </div>
+      </div>
+      
+      {/* Add feedback form */}
+      <div className="mt-8">
+        <FeedbackForm 
+          email={passenger.email} 
+          flightId={flight._id}
+          feedbackType="flight"
+        />
       </div>
     </div>
   );
