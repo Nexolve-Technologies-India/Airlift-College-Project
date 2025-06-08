@@ -44,15 +44,18 @@ export interface IChatContext {
   };
 
   // Booking flow fields
-  step: 'initial' | 'departure' | 'destination' | 'date' | 'searching' | 
-        'selecting_flight' | 'passenger_details' | 'passenger_email' | 
+  step: 'initial' | 'departure' | 'destination' | 'date' | 'searching' |
+        'selecting_flight' | 'passenger_details' | 'passenger_email' |
         'passenger_phone' | 'passenger_address' | 'payment' | 'completed';
+
   from?: string;
   to?: string;
   date?: string;
+
   flights?: IFlightDetails[];
   selectedFlight?: IFlightDetails;
   passengerDetails?: IPassengerDetails;
+
   paymentStatus: 'pending' | 'completed' | 'failed';
 }
 
@@ -119,7 +122,9 @@ const chatSessionSchema = new mongoose.Schema<IChatSession>({
         'completed'
       ],
       default: 'initial',
+      required: true
     },
+
     from: String,
     to: String,
     date: String,
@@ -160,7 +165,8 @@ const chatSessionSchema = new mongoose.Schema<IChatSession>({
     paymentStatus: {
       type: String,
       enum: ['pending', 'completed', 'failed'],
-      default: 'pending'
+      default: 'pending',
+      required: true
     },
   },
   
@@ -184,22 +190,22 @@ const chatSessionSchema = new mongoose.Schema<IChatSession>({
   timestamps: true
 });
 
-// Add any indexes if needed
+// Indexes for performance
 chatSessionSchema.index({ userId: 1 });
 chatSessionSchema.index({ 'context.step': 1 });
 chatSessionSchema.index({ status: 1 });
 chatSessionSchema.index({ createdAt: 1 });
 
-// Add any instance methods if needed
+// Instance method example
 chatSessionSchema.methods.isActive = function(): boolean {
   return this.status === 'active';
 };
 
-// Add any static methods if needed
+// Static method example
 chatSessionSchema.statics.findActiveSession = function(userId: string) {
   return this.findOne({ userId, status: 'active' });
 };
 
-// Create and export the model
 const ChatSession = mongoose.model<IChatSession>('ChatSession', chatSessionSchema);
+
 export default ChatSession;

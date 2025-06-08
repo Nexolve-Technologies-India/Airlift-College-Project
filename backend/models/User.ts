@@ -1,92 +1,126 @@
-import express, { Request, Response } from 'express';
-import User from '../models/User';
+import mongoose, { Document, Schema, Model } from 'mongoose';
 
-const router = express.Router();
+// DateRange interface for price alert date ranges
+interface DateRange {
+  start: Date;
+  end: Date;
+}
 
-// Interface to match your existing searchHistory schema
-interface SearchEntry {
+// PriceAlert interface
+interface PriceAlert {
+  alertName: string;
+  thresholdPrice: number;  // consistent naming
+  active: boolean;
+  createdAt: Date;
+
+  from: string;
+  to: string;
+  dateRange: DateRange;
+}
+
+// Search history subdocument interface
+interface SearchHistoryItem {
   timestamp: Date;
   date?: string;
   from?: string;
   to?: string;
 }
 
-// Get user behavior statistics
-router.get('/stats/:email', async (req: Request<{ email: string }>, res: Response) => {
-  try {
-    const { email } = req.params;
+// Preferences subdocument interface
+interface Preferences {
+  prefersWindowSeat: boolean;
+  prefersAisleSeat: boolean;
+  prefersDirectFlights: boolean;
+  preferredAirlines: string[];
+  budgetRange: {
+    min: number;
+    max: number;
+  };
+}
 
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
+// Main user interface extending mongoose Document
+export interface IUser extends Document {
+  email: string;
+  password: string;
+  name: string;
+  searchHistory: SearchHistoryItem[];
+  preferences: Preferences;
+  loyaltyPoints: number;
+  loyaltyTier: 'standard' | 'silver' | 'gold' | 'platinum';
+  priceAlerts: PriceAlert[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-    const user = await User.findOne({ email });
+// Schema for DateRange subdocument
+const DateRangeSchema = new Schema<DateRange>(
+  {
+    start: { type: Date, required: true },
+    end: { type: Date, required: true },
+  },
+  { _id: false }
+);
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+// Schema for PriceAlert subdocument
+const PriceAlertSchema = new Schema<PriceAlert>(
+  {
+    alertName: { type: String, required: true },
+    thresholdPrice: { type: Number, required: true },
+    active: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now },
 
-    // Type assertion for searchHistory
-    const searchHistory = user.searchHistory as unknown as SearchEntry[];
+    from: { type: String, required: true },
+    to: { type: String, required: true },
+    dateRange: { type: DateRangeSchema, required: true },
+  },
+  { _id: false }
+);
 
-    // Get most frequent destinations
-    const destinations = searchHistory
-      .filter(search => search.to)
-      .map(search => search.to!)
-      .reduce((acc: Record<string, number>, dest) => {
-        acc[dest] = (acc[dest] || 0) + 1;
-        return acc;
-      }, {});
+// Schema for SearchHistoryItem subdocument
+const SearchHistoryItemSchema = new Schema<SearchHistoryItem>(
+  {
+    timestamp: { type: Date, default: Date.now },
+    date: { type: String },
+    from: { type: String },
+    to: { type: String },
+  },
+  { _id: false }
+);
 
-    const topDestinations = Object.entries(destinations)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([dest]) => dest);
+// Schema for Preferences subdocument
+const PreferencesSchema = new Schema<Preferences>(
+  {
+    prefersWindowSeat: { type: Boolean, default: false },
+    prefersAisleSeat: { type: Boolean, default: false },
+    prefersDirectFlights: { type: Boolean, default: true },
+    preferredAirlines: [{ type: String }],
+    budgetRange: {
+      min: { type: Number, default: 0 },
+      max: { type: Number, default: 10000 },
+    },
+  },
+  { _id: false }
+);
 
-    // Get search frequency by day of week
-    const dayOfWeekCounts = searchHistory
-      .map(search => new Date(search.timestamp).getDay())
-      .reduce((acc: Record<string, number>, day) => {
-        const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day];
-        acc[dayName] = (acc[dayName] || 0) + 1;
-        return acc;
-      }, {});
+// User schema
+const UserSchema = new Schema<IUser>(
+  {
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    name: { type: String, required: true },
+    searchHistory: [SearchHistoryItemSchema],
+    preferences: PreferencesSchema,
+    loyaltyPoints: { type: Number, default: 0 },
+    loyaltyTier: {
+      type: String,
+      enum: ['standard', 'silver', 'gold', 'platinum'],
+      default: 'standard',
+    },
+    priceAlerts: [PriceAlertSchema],
+  },
+  { timestamps: true }
+);
 
-    return res.status(200).json({
-      searchCount: searchHistory.length,
-      topDestinations,
-      dayOfWeekCounts,
-    });
-  } catch (error) {
-    console.error('Error fetching behavior stats:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
+const User: Model<IUser> = mongoose.model<IUser>('User', UserSchema);
 
-// Clear user search history
-router.delete('/clear/:email', async (req: Request<{ email: string }>, res: Response) => {
-  try {
-    const { email } = req.params;
-
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Clear search history
-    user.searchHistory = [];
-    await user.save();
-
-    return res.status(200).json({ message: 'Search history cleared successfully' });
-  } catch (error) {
-    console.error('Error clearing search history:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-export default router;
+export default User;

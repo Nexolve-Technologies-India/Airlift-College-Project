@@ -1,6 +1,50 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Mic, Calendar, Users, MapPin, CreditCard, Clock } from 'lucide-react';
 
+declare global {
+  interface Window {
+    webkitSpeechRecognition: unknown;
+  }
+}
+
+interface SpeechRecognition extends EventTarget {
+  // eslint-disable-next-line @typescript-eslint/no-misused-new
+  new (): SpeechRecognition;
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionResultList {
+  [index: number]: SpeechRecognitionResult;
+  length: number;
+}
+
+interface SpeechRecognitionResult {
+  [index: number]: SpeechRecognitionAlternative;
+  length: number;
+  isFinal: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
 interface Message {
   text: string;
   isBot: boolean;
@@ -32,7 +76,7 @@ interface BookingState {
   step: 'initial' | 'searching' | 'from' | 'to' | 'date' | 'passengers' | 'tripType' | 'returnDate' | 'results' | 'booking' | 'payment' | 'confirmation';
   query: Partial<FlightQuery>;
   selectedFlight?: Flight;
-  bookingDetails?: any;
+  bookingDetails?: unknown;
 }
 
 const EnhancedChatBot: React.FC = () => {
@@ -85,7 +129,7 @@ const EnhancedChatBot: React.FC = () => {
       // Various date patterns
       const patterns = [
         // DD/MM/YYYY or DD-MM-YYYY
-        /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/,
+        /(\d{1,2})[/-](\d{1,2})[/-](\d{4})/,
         // DD Month YYYY
         /(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})/i,
         // Month DD, YYYY
@@ -222,7 +266,7 @@ const EnhancedChatBot: React.FC = () => {
     </div>
   );
 
-  const BookingForm: React.FC<{ flight: Flight, onConfirm: (details: any) => void }> = ({ flight, onConfirm }) => {
+  const BookingForm: React.FC<{ flight: Flight, onConfirm: (details: unknown) => void }> = ({ flight, onConfirm }) => {
     const [details, setDetails] = useState({
       name: '',
       email: '',
@@ -350,7 +394,7 @@ const EnhancedChatBot: React.FC = () => {
             break;
             
           case 'date':
-            const parsedDate = parseDate(userInput);
+            { const parsedDate = parseDate(userInput);
             if (parsedDate) {
               const date = new Date(parsedDate);
               const formattedDate = date.toLocaleDateString('en-GB', {
@@ -368,10 +412,10 @@ const EnhancedChatBot: React.FC = () => {
             } else {
               addMessage("I couldn't understand that date. Please provide a future date like '23rd June 2025' or '15/07/2025'.");
             }
-            break;
+            break; }
             
           case 'passengers':
-            const passengers = parseInt(userInput);
+            { const passengers = parseInt(userInput);
             if (passengers > 0 && passengers <= 10) {
               const query = { ...bookingState.query, passengers } as FlightQuery;
               setBookingState(prev => ({ ...prev, query, step: 'results' }));
@@ -401,7 +445,7 @@ const EnhancedChatBot: React.FC = () => {
             } else {
               addMessage("Please enter a valid number of passengers (1-10).");
             }
-            break;
+            break; }
             
           default:
             // General help and other queries
@@ -449,7 +493,7 @@ const EnhancedChatBot: React.FC = () => {
     }
 
     try {
-      const recognition = new (window as any).webkitSpeechRecognition();
+      const recognition = new (window as any).webkitSpeechRecognition() as SpeechRecognition;
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.lang = 'en-US';

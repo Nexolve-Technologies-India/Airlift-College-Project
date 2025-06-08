@@ -1,22 +1,22 @@
 // services/PriceAlertService.ts
 import User from '../models/User';
-import Flight from '../models/flight'; // Corrected to lowercase 'flight'
+import Flight from '../models/flight'; // Adjust if your filename casing differs
 
-// Define interfaces for TypeScript
 interface DateRange {
   start: Date;
   end: Date;
 }
 
 interface PriceAlert {
-  from: string;
-  to: string;
-  maxPrice: number;
-  dateRange: DateRange;
-  isActive: boolean;
+  alertName: string;
+  thresholdPrice: number;
+  active: boolean;
+  createdAt: Date;
+  from?: string;
+  to?: string;
+  dateRange?: DateRange;
 }
 
-// Define Flight interface based on flightSchema
 interface FlightDoc {
   airline: string;
   flightNumber: string;
@@ -47,30 +47,29 @@ class PriceAlertService {
     endDate: string
   ): Promise<boolean> {
     try {
-      // Find the user
       let user = await User.findOne({ email });
 
-      // Create user if doesn't exist
       if (!user) {
         user = new User({
           email,
           name: 'Guest User',
           loyaltyPoints: 0,
           loyaltyTier: 'standard',
-          priceAlerts: [], // Initialize priceAlerts array
+          priceAlerts: [],
         });
       }
 
-      // Add the price alert
       user.priceAlerts.push({
+        alertName: `${from} to ${to} under ${maxPrice}`,
+        thresholdPrice: maxPrice,
+        active: true,
+        createdAt: new Date(),
         from,
         to,
-        maxPrice,
         dateRange: {
           start: new Date(startDate),
           end: new Date(endDate),
         },
-        isActive: true,
       });
 
       await user.save();
@@ -85,11 +84,10 @@ class PriceAlertService {
     try {
       const user = await User.findOne({ email });
 
-      if (!user) {
-        return [];
-      }
+      if (!user) return [];
 
-      return user.priceAlerts as PriceAlert[]; // Type assertion based on usage
+      // Cast is temporary until User schema is properly typed
+      return user.priceAlerts as unknown as PriceAlert[];
     } catch (error) {
       console.error('Error getting price alerts:', error);
       return [];
@@ -98,33 +96,32 @@ class PriceAlertService {
 
   static async checkPriceDrops(): Promise<Notification[]> {
     try {
-      // Get all active price alerts
-      const users = await User.find({ 'priceAlerts.isActive': true });
+      const users = await User.find({ 'priceAlerts.active': true });
 
       const notifications: Notification[] = [];
 
-      // Check each user's alerts
       for (const user of users) {
-        for (const alert of user.priceAlerts as PriceAlert[]) { // Type assertion
-          if (!alert.isActive) continue;
+        for (const alert of user.priceAlerts as unknown as PriceAlert[]) {
+          if (!alert.active) continue;
 
-          // Find flights that match the alert criteria
+          // Defensive check for dateRange
+          if (!alert.dateRange?.start || !alert.dateRange?.end) continue;
+
           const flights = await Flight.find({
             from: alert.from,
             to: alert.to,
-            price: { $lte: alert.maxPrice },
+            price: { $lte: alert.thresholdPrice },
             date: {
               $gte: alert.dateRange.start,
               $lte: alert.dateRange.end,
             },
           }).limit(5);
 
-          // If matching flights found, create notification
           if (flights.length > 0) {
             notifications.push({
               email: user.email,
               alert,
-              flights: flights as FlightDoc[], // Type assertion based on Flight model
+              flights: flights as FlightDoc[],
             });
           }
         }

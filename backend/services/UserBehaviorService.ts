@@ -80,7 +80,7 @@ class UserBehaviorService {
 
       let user = (await User.findOne({ email })) as UserDocument | null;
       if (!user) {
-        user = new User({ email, name: 'Guest User' }) as UserDocument;
+        user = new User({ email, name: 'Guest User' }) as unknown as UserDocument;
       }
 
       const flightObjectId = new Types.ObjectId(flightId);
@@ -139,7 +139,7 @@ class UserBehaviorService {
     try {
       let user = (await User.findOne({ email })) as UserDocument | null;
       if (!user) {
-        user = new User({ email, name: 'Guest User' }) as UserDocument;
+        user = new User({ email, name: 'Guest User' }) as unknown as UserDocument;
       }
 
       user.searchHistory.unshift({
@@ -199,7 +199,7 @@ class UserBehaviorService {
 
       let user = (await User.findOne({ email })) as UserDocument | null;
       if (!user) {
-        user = new User({ email, name: 'Guest User' }) as UserDocument;
+        user = new User({ email, name: 'Guest User' }) as unknown as UserDocument;
       }
 
       const pointsToAdd = Math.floor(bookingAmount / 100);
@@ -294,7 +294,7 @@ class UserBehaviorService {
 
       let user = (await User.findOne({ email })) as UserDocument | null;
       if (!user) {
-        user = new User({ email, name: 'Guest User' }) as UserDocument;
+        user = new User({ email, name: 'Guest User' }) as unknown as UserDocument;
       }
 
       user.priceAlerts.push({

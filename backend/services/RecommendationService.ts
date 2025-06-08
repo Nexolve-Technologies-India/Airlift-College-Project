@@ -1,11 +1,12 @@
-import User from '../models/User';
+import User, { IUser } from '../models/User';
 import Flight from '../models/flight';
 import Booking from '../models/booking';
 import Recommendation from '../models/recommendationModel';
 import tf from '@tensorflow/tfjs-node';
+import { Types } from 'mongoose';
 
 interface FlightDoc {
-  _id: string;
+  _id: Types.ObjectId | string;
   airline: string;
   flightNumber: string;
   from: string;
@@ -19,7 +20,7 @@ interface FlightDoc {
   status: string;
 }
 
-interface Recommendation {
+interface RecommendationResult {
   type: 'neural' | 'personalized' | 'generic' | 'predicted';
   message: string;
   flights: FlightDoc[];
@@ -28,30 +29,25 @@ interface Recommendation {
 class RecommendationService {
   private static model: tf.LayersModel | null = null;
   private static isTraining = false;
-  
-  // Initialize the recommendation model
+
+  // Initialize or load the neural network model
   static async initializeModel() {
     if (!this.model && !this.isTraining) {
       this.isTraining = true;
       try {
-        // Neural Collaborative Filtering model
         this.model = tf.sequential();
-        this.model.add(tf.layers.dense({
-          units: 128,
-          activation: 'relu',
-          inputShape: [15] // Number of features
-        }));
+        this.model.add(tf.layers.dense({ units: 128, activation: 'relu', inputShape: [15] }));
         this.model.add(tf.layers.dropout({ rate: 0.2 }));
         this.model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
         this.model.add(tf.layers.dropout({ rate: 0.2 }));
         this.model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
-        
+
         this.model.compile({
           optimizer: tf.train.adam(0.001),
           loss: 'binaryCrossentropy',
-          metrics: ['accuracy']
+          metrics: ['accuracy'],
         });
-        
+
         console.log('Recommendation model initialized');
       } finally {
         this.isTraining = false;
@@ -60,11 +56,10 @@ class RecommendationService {
     return this.model;
   }
 
-  // Extract features from flight and user data
-  private static extractFeatures(flight: FlightDoc, user: any): number[] {
-    // Normalize features between 0-1
-    const features = [
-      flight.price / 5000, // Assuming max price is 5000
+  // Extract features from flight and user preferences for ML model input
+  private static extractFeatures(flight: FlightDoc, user: IUser | null): number[] {
+    const baseFeatures = [
+      flight.price / 5000, // Normalize price
       this.normalizeDuration(flight.duration),
       ...this.encodeLocation(flight.from),
       ...this.encodeLocation(flight.to),
@@ -72,22 +67,26 @@ class RecommendationService {
       this.isMorningFlight(flight.departureTime) ? 1 : 0,
       user?.preferences?.prefersWindowSeat ? 1 : 0,
       user?.preferences?.prefersAisleSeat ? 1 : 0,
-      user?.preferences?.prefersDirectFlights ? 1 : 0
+      user?.preferences?.prefersDirectFlights ? 1 : 0,
     ];
-    
-    return features.slice(0, 15); // Ensure we have exactly 15 features
+
+    // Pad features to length 15 with zeros if needed
+    while (baseFeatures.length < 15) baseFeatures.push(0);
+
+    return baseFeatures;
   }
 
   private static normalizeDuration(duration: string): number {
-    const [hours, mins] = duration.split('h');
-    return (parseInt(hours) + (parseInt(mins) / 60)) / 12; // Normalize to 12h max
+    // duration format example: "2h 15m"
+    const parts = duration.match(/(\d+)h\s*(\d+)?m?/);
+    const hours = parts ? parseInt(parts[1]) : 0;
+    const minutes = parts && parts[2] ? parseInt(parts[2]) : 0;
+    return (hours + minutes / 60) / 12; // normalize max 12 hours
   }
 
   private static encodeLocation(location: string): number[] {
-    // One-hot encode popular locations (simplified)
     const locations = ['DEL', 'BOM', 'BLR', 'HYD', 'MAA'];
-    const index = locations.indexOf(location);
-    return locations.map((_, i) => i === index ? 1 : 0);
+    return locations.map((loc) => (loc === location ? 1 : 0));
   }
 
   private static isWeekend(date: Date): boolean {
@@ -101,107 +100,104 @@ class RecommendationService {
   }
 
   // Train model with user's booking history
-  private static async trainUserModel(userId: string) {
+  private static async trainUserModel(userId: string): Promise<tf.LayersModel | null> {
     if (!this.model) await this.initializeModel();
     if (!this.model) return null;
-    
+
+    // Fetch user bookings and all flights
     const [bookings, allFlights] = await Promise.all([
       Booking.find({ 'passengerDetails.email': userId })
         .populate('flightId')
-        .limit(1000),
-      Flight.find().limit(1000)
+        .limit(1000)
+        .lean<{ flightId: FlightDoc }[]>(),
+      Flight.find().limit(1000).lean<FlightDoc[]>(),
     ]);
-    
-    if (bookings.length < 5) return null; // Not enough data
-    
-    // Prepare training data - positive (booked) and negative (not booked) examples
-    const positiveExamples = bookings.map(booking => ({
-      flight: booking.flightId,
-      label: 1
-    }));
-    
-    // Generate negative examples (flights not booked)
+
+    if (bookings.length < 5) return null; // Not enough data to train
+
+    const positiveExamples = bookings
+      .filter((b) => b.flightId)
+      .map((b) => ({ flight: b.flightId as FlightDoc, label: 1 }));
+
+    const positiveIds = new Set(positiveExamples.map((b) => String(b.flight._id)));
+
     const negativeExamples = allFlights
-      .filter(f => !bookings.some(b => b.flightId._id.equals(f._id)))
-      .slice(0, Math.min(positiveExamples.length * 3, 1000)) // 3:1 negative:positive ratio
-      .map(flight => ({ flight, label: 0 }));
-    
+      .filter((f) => !positiveIds.has(String(f._id)))
+      .slice(0, Math.min(positiveExamples.length * 3, 1000))
+      .map((flight) => ({ flight, label: 0 }));
+
     const trainingData = [...positiveExamples, ...negativeExamples];
-    
-    // Shuffle data
+
+    // Shuffle training data
     for (let i = trainingData.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [trainingData[i], trainingData[j]] = [trainingData[j], trainingData[i]];
     }
-    
-    const user = await User.findById(userId);
-    const features = trainingData.map(({ flight }) => 
-      this.extractFeatures(flight, user));
+
+    const user = await User.findById(userId).lean<IUser>();
+    const features = trainingData.map(({ flight }) => this.extractFeatures(flight, user));
     const labels = trainingData.map(({ label }) => label);
-    
-    const xs = tf.tensor2d(features);
+
+    const xs = tf.tensor2d(features, [features.length, 15]);
     const ys = tf.tensor1d(labels);
-    
+
     await this.model.fit(xs, ys, {
       epochs: 20,
       batchSize: 32,
-      validationSplit: 0.2
+      validationSplit: 0.2,
     });
-    
+
+    xs.dispose();
+    ys.dispose();
+
     return this.model;
   }
 
-  // Get neural recommendations
-  static async getNeuralRecommendations(email: string): Promise<Recommendation> {
+  // Get neural network based recommendations for user email
+  static async getNeuralRecommendations(email: string): Promise<RecommendationResult> {
     try {
-      const user = await User.findOne({ email }).select('+preferences');
+      const user = await User.findOne({ email }).lean<IUser>();
       if (!user) return this.getGenericRecommendations();
-      
-      // Get or train user model
-      const userModel = await this.trainUserModel(user._id);
+
+      const userModel = await this.trainUserModel(user._id.toString());
       if (!userModel) return this.getPersonalizedRecommendations(email);
-      
-      // Get candidate flights (next 30 days)
+
       const candidateFlights = await Flight.find({
-        date: { 
+        date: {
           $gte: new Date(),
-          $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        }
-      }).limit(500);
-      
-      if (candidateFlights.length === 0) {
-        return this.getGenericRecommendations();
-      }
-      
-      // Score each flight
+          $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      })
+        .limit(500)
+        .lean<FlightDoc[]>();
+
       const scoredFlights = await Promise.all(
         candidateFlights.map(async (flight) => {
           const features = this.extractFeatures(flight, user);
-          const score = await userModel.predict(tf.tensor2d([features])).data();
-          return { flight, score: score[0] };
+          const scoreTensor = userModel.predict(tf.tensor2d([features])) as tf.Tensor;
+          const score = (await scoreTensor.data())[0];
+          scoreTensor.dispose();
+          return { flight, score };
         })
       );
-      
-      // Sort by score and take top 5
+
       const topFlights = scoredFlights
         .sort((a, b) => b.score - a.score)
         .slice(0, 5)
         .map(({ flight, score }) => {
-          // Store recommendation for future reference
           new Recommendation({
             userId: user._id,
             flightId: flight._id,
             score,
-            recommendationType: 'neural'
+            recommendationType: 'neural',
           }).save();
-          
-          return flight.toObject();
+          return flight;
         });
-      
+
       return {
         type: 'neural',
         message: 'Recommended flights based on your travel patterns:',
-        flights: topFlights
+        flights: topFlights,
       };
     } catch (error) {
       console.error('Error in neural recommendations:', error);
@@ -209,121 +205,53 @@ class RecommendationService {
     }
   }
 
-  // Get personalized recommendations based on search history
-  static async getPersonalizedRecommendations(email: string): Promise<Recommendation> {
+  // Personalized recommendations based on user preferences and history
+  static async getPersonalizedRecommendations(email: string): Promise<RecommendationResult> {
     try {
-      const user = await User.findOne({ email });
+      const user = await User.findOne({ email }).lean<IUser>();
       if (!user) return this.getGenericRecommendations();
 
-      // Get user's booking history
-      const bookings = await Booking.find({ 'passengerDetails.email': email })
-        .populate('flightId')
-        .limit(100);
-      
-      if (bookings.length === 0) {
-        return this.getGenericRecommendations();
-      }
-      
-      // Count destinations
-      const destinationCounts = new Map<string, number>();
-      bookings.forEach(booking => {
-        const flight = booking.flightId as unknown as FlightDoc;
-        const count = destinationCounts.get(flight.to) || 0;
-        destinationCounts.set(flight.to, count + 1);
-      });
-      
-      // Sort by frequency
-      const sortedDestinations = [...destinationCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .map(([dest]) => dest);
-      
-      // Get flights to top destinations
-      const recommendedFlights = [];
-      for (const dest of sortedDestinations.slice(0, 3)) {
-        const flights = await Flight.find({
-          to: dest,
-          date: { $gte: new Date() }
-        }).limit(2);
-        recommendedFlights.push(flights);
-      }
-      
-      if (recommendedFlights.length > 0) {
-        return {
-          type: 'personalized',
-          message: 'Based on your booking history:',
-          flights: recommendedFlights.slice(0, 5).map(f => f.toObject())
-        };
-      }
-      
-      return this.getGenericRecommendations();
+      // Find flights matching preferences, dates, price range, etc.
+      const flights = await Flight.find({
+        from: { $in: [user.preferences?.preferredAirlines || ''] },
+        price: {
+          $gte: user.preferences?.budgetRange.min || 0,
+          $lte: user.preferences?.budgetRange.max || 10000,
+        },
+        date: { $gte: new Date() },
+      })
+        .limit(5)
+        .lean<FlightDoc[]>();
+
+      return {
+        type: 'personalized',
+        message: 'Flights matching your preferences',
+        flights,
+      };
     } catch (error) {
       console.error('Error in personalized recommendations:', error);
       return this.getGenericRecommendations();
     }
   }
 
-  // Get generic popular recommendations
-  static async getGenericRecommendations(): Promise<Recommendation> {
-    try {
-      const popularFlights = await Flight.find({
-        to: { $in: ['Mumbai', 'Delhi', 'Bangalore'] },
-        date: { $gte: new Date() }
-      }).limit(5);
-      
-      return {
-        type: 'generic',
-        message: 'Popular flights you might like:',
-        flights: popularFlights.map(f => f.toObject())
-      };
-    } catch (error) {
-      console.error('Error in generic recommendations:', error);
-      return {
-        type: 'generic',
-        message: 'Popular flights you might like:',
-        flights: []
-      };
-    }
+  // Generic fallback recommendations - popular or best-selling flights
+  static async getGenericRecommendations(): Promise<RecommendationResult> {
+    const flights = await Flight.find({ date: { $gte: new Date() } })
+      .sort({ seatsAvailable: -1 })
+      .limit(5)
+      .lean<FlightDoc[]>();
+
+    return {
+      type: 'generic',
+      message: 'Popular flights you may like',
+      flights,
+    };
   }
 
-  // Get predicted travel needs (frequent routes)
-  static async getPredictedTravelNeeds(email: string): Promise<Recommendation | null> {
-    try {
-      const bookings = await Booking.find({ 'passengerDetails.email': email })
-        .populate('flightId')
-        .limit(100);
-      
-      if (bookings.length < 3) return null;
-      
-      // Find most frequent route
-      const routeCounts = new Map<string, number>();
-      bookings.forEach(booking => {
-        const flight = booking.flightId as unknown as FlightDoc;
-        const route = `${flight.from}-${flight.to}`;
-        const count = routeCounts.get(route) || 0;
-        routeCounts.set(route, count + 1);
-      });
-      
-      const sortedRoutes = [...routeCounts.entries()].sort((a, b) => b[1] - a[1]);
-      if (sortedRoutes[0][1] < 2) return null; // Need at least 2 bookings on same route
-      
-      const [from, to] = sortedRoutes[0][0].split('-');
-      const upcomingFlights = await Flight.find({
-        from,
-        to,
-        date: { $gte: new Date() }
-      }).limit(3);
-      
-      if (upcomingFlights.length === 0) return null;
-      
-      return {
-        type: 'predicted',
-        message: `You frequently travel from ${from} to ${to}. Upcoming flights:`,
-        flights: upcomingFlights.map(f => f.toObject())
-      };
-    } catch (error) {
-      console.error('Error in predicted recommendations:', error);
-      return null;
-    }
+  // Predicted recommendations using external AI or pre-trained model (stub)
+  static async getPredictedRecommendations(): Promise<RecommendationResult> {
+    // Placeholder for future AI integration
+    return this.getGenericRecommendations();
   }
 }
 

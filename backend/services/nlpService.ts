@@ -160,7 +160,8 @@ class NLPService {
   }
 
   public updateContext(currentContext: IChatContext, nlpResponse: NLPResponse): IChatContext {
-    const updatedContext = { ...currentContext };
+    // Start with a shallow copy of the current context
+    const updatedContext: IChatContext = { ...currentContext };
 
     // Update intent if confidence is high enough
     if (nlpResponse.intent.confidence > 0.7) {
@@ -175,9 +176,10 @@ class NLPService {
     nlpResponse.entities.forEach(entity => {
       switch (entity.type) {
         case 'location':
+          // Prioritize filling 'from' first, then 'to'
           if (!updatedContext.from && isSupportedCity(entity.value)) {
             updatedContext.from = entity.value;
-          } else if (!updatedContext.to && isSupportedCity(entity.value)) {
+          } else if (updatedContext.from && !updatedContext.to && isSupportedCity(entity.value) && entity.value !== updatedContext.from) {
             updatedContext.to = entity.value;
           }
           break;
@@ -202,8 +204,13 @@ class NLPService {
               seatsAvailable: 100,
               status: 'scheduled'
             };
+          } else {
+            // If already selectedFlight exists, update flightNumber maybe
+            updatedContext.selectedFlight.flightNumber = entity.value;
           }
           break;
+
+        // Add more entity types as needed
       }
     });
 

@@ -55,7 +55,7 @@ interface SessionContext {
   selectedFlight?: FlightData;
   passengerDetails?: PassengerDetails;
   intent?: string;
-  entities?: any[];
+  entities?: unknown[];
 }
 
 const generateSeatNumber = (): string => {
@@ -154,21 +154,21 @@ router.post('/message', async (req: Request, res: Response): Promise<void> => {
         break;
 
       case 'departure':
-        const locationEntity = nlpResponse.entities.find(e => e.type === 'location');
+        { const locationEntity = nlpResponse.entities.find(e => e.type === 'location');
         context.from = locationEntity ? locationEntity.value : message;
         response = 'Got it! Where are you flying to?';
         context.step = 'destination';
-        break;
+        break; }
 
       case 'destination':
-        const toLocationEntity = nlpResponse.entities.find(e => e.type === 'location');
+        { const toLocationEntity = nlpResponse.entities.find(e => e.type === 'location');
         context.to = toLocationEntity ? toLocationEntity.value : message;
         response = 'Great! What date are you planning to travel? (YYYY-MM-DD)';
         context.step = 'date';
-        break;
+        break; }
 
       case 'date':
-        const dateEntity = nlpResponse.entities.find(e => e.type === 'date');
+        { const dateEntity = nlpResponse.entities.find(e => e.type === 'date');
         context.date = dateEntity ? dateEntity.value : message;
         const flights = await Flight.find({
           from: context.from,
@@ -200,7 +200,7 @@ router.post('/message', async (req: Request, res: Response): Promise<void> => {
           response = 'No flights found for your search. Please try again.';
           context.step = 'initial';
         }
-        break;
+        break; }
 
       case 'selecting_flight':
         if (context.flights && context.flights.length > 0) {
@@ -303,7 +303,7 @@ router.post('/message', async (req: Request, res: Response): Promise<void> => {
       timestamp: new Date()
     });
 
-    session.context = context as any;
+    session.context = context as unknown;
     await session.save();
 
     res.json({ 

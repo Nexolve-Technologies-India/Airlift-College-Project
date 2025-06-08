@@ -1,25 +1,26 @@
 {
+  "extends": "@tsconfig/node16/tsconfig.json",
   "compilerOptions": {
     "target": "es2018",
-    "module": "commonjs",
+    "module": "nodenext",
     "lib": ["es2018", "esnext.asynciterable"],
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDir": "./", // Change to "./src" if server.ts is in src/
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true, // This should help skip type checking for declaration files
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext", // Changed to nodenext for better ES module support
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
       "*": ["node_modules/*", "src/types/*"]
     },
-    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "typeRoots": ["./node_modules/@types", "./types"],
     "sourceMap": true,
     "declaration": true,
     "allowJs": true,
-    "noImplicitAny": false, // Consider setting to false temporarily
+    "noImplicitAny": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
