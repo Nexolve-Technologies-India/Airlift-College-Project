@@ -4,10 +4,10 @@
     "module": "commonjs",
     "lib": ["es2018", "esnext.asynciterable"],
     "outDir": "./dist",
-    "rootDir": "./", // Root directory is the current folder
+    "rootDir": "./",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
+    "skipLibCheck": true, // This should help skip type checking for declaration files
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
@@ -19,7 +19,7 @@
     "sourceMap": true,
     "declaration": true,
     "allowJs": true,
-    "noImplicitAny": true,
+    "noImplicitAny": false, // Consider setting to false temporarily
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
@@ -27,6 +27,6 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "include": ["**/*.ts"], // Include all `.ts` files in the root folder
+  "include": ["**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -1,9 +1,8 @@
 import mongoose from 'mongoose';
 
 const bookingSchema = new mongoose.Schema({
-  flightId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Flight',
+  destination: {
+    type: String,
     required: true,
   },
   passengerDetails: {
@@ -12,28 +11,44 @@ const bookingSchema = new mongoose.Schema({
     phone: { type: String, required: true },
     address: { type: String, required: true },
   },
-  bookingDate: { type: Date, default: Date.now },
+  passengers: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 10
+  },
+  bookingDate: { 
+    type: Date, 
+    default: Date.now 
+  },
   paymentStatus: {
     type: String,
-    enum: ['pending', 'completed', 'failed'],
+    enum: ['pending', 'completed', 'failed', 'refunded'],
     default: 'pending',
   },
   bookingStatus: {
     type: String,
-    enum: ['confirmed', 'cancelled', 'pending'],
-    default: 'pending',
+    enum: ['confirmed', 'cancelled', 'pending', 'completed'],
+    default: 'confirmed',
   },
-  totalAmount: { type: Number, required: true },
-  ticketNumber: { type: String, unique: true },
-  seatNumber: { type: String, required: true },
+  totalAmount: { 
+    type: Number, 
+    required: true 
+  },
+  ticketNumber: { 
+    type: String, 
+    unique: true 
+  },
 }, { timestamps: true });
 
 // Generate ticket number before saving
 bookingSchema.pre('save', async function (next) {
   if (!this.ticketNumber) {
-    this.ticketNumber = 'TK' + Date.now() + Math.floor(Math.random() * 1000);
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    this.ticketNumber = `TRV-${Date.now().toString().slice(-6)}-${randomNum}`;
   }
   next();
 });
 
-export default mongoose.model('Booking', bookingSchema);
+const Booking = mongoose.model('Booking', bookingSchema);
+export default Booking;

@@ -1,8 +1,31 @@
 import mongoose from 'mongoose';
 import Flight from '../models/flight';
 
-// Connect to MongoDB
-mongoose.connect('mongodb://localhost:8848/FlightDB');
+// Interface for Flight data
+interface IFlight {
+  airline: string;
+  flightNumber: string;
+  from: string;
+  to: string;
+  departureTime: string;
+  arrivalTime: string;
+  duration: string;
+  price: number;
+  seatsAvailable: number;
+  date: string;
+  status: string;
+}
+
+// Connect to MongoDB with error handling
+const connectToDatabase = async () => {
+  try {
+    await mongoose.connect('mongodb://localhost:8848/FlightDB');
+    console.log('Connected to MongoDB successfully');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
+  }
+};
 
 // Function to get random element from array
 const getRandomElement = <T>(array: T[]): T => {
@@ -35,7 +58,7 @@ const generateFlight = (
   to: string,
   departureTime: string,
   date: string
-) => {
+): IFlight => {
   // Possible durations in hours
   const possibleDurations = [2, 2.5, 3];
   const durationHours = getRandomElement(possibleDurations);
@@ -53,7 +76,7 @@ const generateFlight = (
     to,
     departureTime,
     arrivalTime,
-    duration: `${durationHours}h ${durationHours % 1 ? '30m' : '0m'}`,
+    duration: `${Math.floor(durationHours)}h ${durationHours % 1 ? '30m' : '0m'}`,
     price: getRandomElement(possiblePrices),
     seatsAvailable: 100,
     date,
@@ -62,8 +85,8 @@ const generateFlight = (
 };
 
 // Function to generate flights for the given parameters
-const generateFlights = () => {
-  const flights: any[] = [];
+const generateFlights = (): IFlight[] => {
+  const flights: IFlight[] = [];
   const airline = 'SkyWings Airlines';
   const routes = [
     { from: 'Mumbai', to: 'Delhi' },
@@ -90,11 +113,13 @@ const generateFlights = () => {
 
   let flightCounter = 100; // Starting flight number
 
-  for (let date = startDate; date <= endDate; date.setDate(date.getDate() + 1)) {
-    const dateString = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+  // Clone the start date to avoid modifying the original
+  const currentDate = new Date(startDate);
+
+  while (currentDate <= endDate) {
+    const dateString = currentDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
 
     routes.forEach((route) => {
-      // Generate flights for each hour
       hourlyDepartures.forEach((departureTime) => {
         flights.push(
           generateFlight(
@@ -109,6 +134,8 @@ const generateFlights = () => {
         flightCounter++;
       });
     });
+
+    currentDate.setDate(currentDate.getDate() + 1);
   }
 
   return flights;
@@ -117,6 +144,8 @@ const generateFlights = () => {
 // Insert flights into the database
 const seedFlights = async () => {
   try {
+    await connectToDatabase();
+
     // Clear existing flights
     console.log('Clearing existing flights...');
     await Flight.deleteMany({});
@@ -135,10 +164,9 @@ const seedFlights = async () => {
   } finally {
     await mongoose.connection.close();
     console.log('Database connection closed.');
+    process.exit(0);
   }
 };
 
 // Run the seeding function
 seedFlights();
-
-//Run code by command - npx ts-node datascript.ts

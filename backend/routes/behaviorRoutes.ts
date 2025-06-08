@@ -1,10 +1,9 @@
-// routes/behaviorRoutes.ts
 import express, { Request, Response } from 'express';
 import User from '../models/User';
 
 const router = express.Router();
 
-// Define interface for SearchEntry (based on previous usage)
+// Interface to match your existing searchHistory schema
 interface SearchEntry {
   timestamp: Date;
   date?: string;
@@ -13,7 +12,7 @@ interface SearchEntry {
 }
 
 // Get user behavior statistics
-router.get('/stats/:email', async (req: Request, res: Response) => {
+router.get('/stats/:email', async (req: Request<{ email: string }>, res: Response) => {
   try {
     const { email } = req.params;
 
@@ -27,9 +26,12 @@ router.get('/stats/:email', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Get most frequent destinations, filtering out undefined 'to' values
-    const destinations = (user.searchHistory as SearchEntry[])
-      .filter(search => search.to !== undefined) // Ensure 'to' exists
+    // Type assertion for searchHistory
+    const searchHistory = user.searchHistory as unknown as SearchEntry[];
+
+    // Get most frequent destinations
+    const destinations = searchHistory
+      .filter(search => search.to)
       .map(search => search.to!)
       .reduce((acc: Record<string, number>, dest) => {
         acc[dest] = (acc[dest] || 0) + 1;
@@ -42,7 +44,7 @@ router.get('/stats/:email', async (req: Request, res: Response) => {
       .map(([dest]) => dest);
 
     // Get search frequency by day of week
-    const dayOfWeekCounts = (user.searchHistory as SearchEntry[])
+    const dayOfWeekCounts = searchHistory
       .map(search => new Date(search.timestamp).getDay())
       .reduce((acc: Record<string, number>, day) => {
         const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day];
@@ -51,19 +53,18 @@ router.get('/stats/:email', async (req: Request, res: Response) => {
       }, {});
 
     return res.status(200).json({
-      searchCount: user.searchHistory.length,
-      recentlyViewedCount: user.recentlyViewedFlights.length,
+      searchCount: searchHistory.length,
       topDestinations,
       dayOfWeekCounts,
     });
   } catch (error) {
-    console.error('Error fetching behavior stats:', error); // Use error to log it
+    console.error('Error fetching behavior stats:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Clear user behavior data
-router.delete('/clear/:email', async (req: Request, res: Response) => {
+// Clear user search history
+router.delete('/clear/:email', async (req: Request<{ email: string }>, res: Response) => {
   try {
     const { email } = req.params;
 
@@ -77,15 +78,13 @@ router.delete('/clear/:email', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Clear behavior data
+    // Clear search history
     user.searchHistory = [];
-    user.recentlyViewedFlights = [];
-
     await user.save();
 
-    return res.status(200).json({ message: 'Behavior data cleared successfully' });
+    return res.status(200).json({ message: 'Search history cleared successfully' });
   } catch (error) {
-    console.error('Error clearing behavior data:', error); // Use error to log it
+    console.error('Error clearing search history:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

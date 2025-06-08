@@ -35,7 +35,7 @@ export interface IChatContext {
     date?: string[];
     airline?: string[];
     price?: number[];
-    [key: string]: any;
+    [key: string]: unknown;
   };
   confidence?: number;
   sentiment?: {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'; // Added Link import
-import Footer from './components/Footer'; // Removed unused Navbar import
+// import Footer from './components/Footer'; // Removed unused Navbar import
 import Home from './pages/Home';
 import About from './pages/About';
 import Contact from './pages/Contact';
