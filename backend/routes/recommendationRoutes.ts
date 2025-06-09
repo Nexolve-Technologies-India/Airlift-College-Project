@@ -44,7 +44,9 @@ router.get('/predicted/:email', async (req: Request, res: Response) => {
     }
 
     const prediction = await RecommendationService.getPredictedTravelNeeds(email);
-    if (prediction) {
+    
+    // Assuming getPredictedTravelNeeds returns: PredictionType | null | undefined
+    if (prediction != null) {
       return res.status(200).json(prediction);
     } else {
       return res.status(404).json({ message: 'No predictions available' });
@@ -56,7 +58,7 @@ router.get('/predicted/:email', async (req: Request, res: Response) => {
 });
 
 // Get generic recommendations
-router.get('/generic', async (req: Request, res: Response) => {
+router.get('/generic', async (_req: Request, res: Response) => {
   try {
     const recommendations = await RecommendationService.getGenericRecommendations();
     return res.status(200).json(recommendations);

@@ -27,10 +27,9 @@ interface RecommendationResult {
 }
 
 class RecommendationService {
-  private static model: tf.LayersModel | null = null;
+  private static model: tf.Sequential | null = null;
   private static isTraining = false;
 
-  // Initialize or load the neural network model
   static async initializeModel() {
     if (!this.model && !this.isTraining) {
       this.isTraining = true;
@@ -56,10 +55,9 @@ class RecommendationService {
     return this.model;
   }
 
-  // Extract features from flight and user preferences for ML model input
   private static extractFeatures(flight: FlightDoc, user: IUser | null): number[] {
     const baseFeatures = [
-      flight.price / 5000, // Normalize price
+      flight.price / 5000,
       this.normalizeDuration(flight.duration),
       ...this.encodeLocation(flight.from),
       ...this.encodeLocation(flight.to),
@@ -70,18 +68,15 @@ class RecommendationService {
       user?.preferences?.prefersDirectFlights ? 1 : 0,
     ];
 
-    // Pad features to length 15 with zeros if needed
     while (baseFeatures.length < 15) baseFeatures.push(0);
-
     return baseFeatures;
   }
 
   private static normalizeDuration(duration: string): number {
-    // duration format example: "2h 15m"
     const parts = duration.match(/(\d+)h\s*(\d+)?m?/);
     const hours = parts ? parseInt(parts[1]) : 0;
     const minutes = parts && parts[2] ? parseInt(parts[2]) : 0;
-    return (hours + minutes / 60) / 12; // normalize max 12 hours
+    return (hours + minutes / 60) / 12;
   }
 
   private static encodeLocation(location: string): number[] {
@@ -99,12 +94,10 @@ class RecommendationService {
     return hour >= 6 && hour < 12;
   }
 
-  // Train model with user's booking history
-  private static async trainUserModel(userId: string): Promise<tf.LayersModel | null> {
+  private static async trainUserModel(userId: string): Promise<tf.Sequential | null> {
     if (!this.model) await this.initializeModel();
     if (!this.model) return null;
 
-    // Fetch user bookings and all flights
     const [bookings, allFlights] = await Promise.all([
       Booking.find({ 'passengerDetails.email': userId })
         .populate('flightId')
@@ -113,7 +106,7 @@ class RecommendationService {
       Flight.find().limit(1000).lean<FlightDoc[]>(),
     ]);
 
-    if (bookings.length < 5) return null; // Not enough data to train
+    if (bookings.length < 5) return null;
 
     const positiveExamples = bookings
       .filter((b) => b.flightId)
@@ -128,13 +121,14 @@ class RecommendationService {
 
     const trainingData = [...positiveExamples, ...negativeExamples];
 
-    // Shuffle training data
     for (let i = trainingData.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [trainingData[i], trainingData[j]] = [trainingData[j], trainingData[i]];
     }
 
-    const user = await User.findById(userId).lean<IUser>();
+    const user = await User.findById(userId).lean<{ _id: Types.ObjectId } & IUser>();
+    if (!user) return null;
+
     const features = trainingData.map(({ flight }) => this.extractFeatures(flight, user));
     const labels = trainingData.map(({ label }) => label);
 
@@ -153,10 +147,9 @@ class RecommendationService {
     return this.model;
   }
 
-  // Get neural network based recommendations for user email
   static async getNeuralRecommendations(email: string): Promise<RecommendationResult> {
     try {
-      const user = await User.findOne({ email }).lean<IUser>();
+      const user = await User.findOne({ email }).lean<{ _id: Types.ObjectId } & IUser>();
       if (!user) return this.getGenericRecommendations();
 
       const userModel = await this.trainUserModel(user._id.toString());
@@ -205,13 +198,11 @@ class RecommendationService {
     }
   }
 
-  // Personalized recommendations based on user preferences and history
   static async getPersonalizedRecommendations(email: string): Promise<RecommendationResult> {
     try {
-      const user = await User.findOne({ email }).lean<IUser>();
+      const user = await User.findOne({ email }).lean<{ _id: Types.ObjectId } & IUser>();
       if (!user) return this.getGenericRecommendations();
 
-      // Find flights matching preferences, dates, price range, etc.
       const flights = await Flight.find({
         from: { $in: [user.preferences?.preferredAirlines || ''] },
         price: {
@@ -234,7 +225,6 @@ class RecommendationService {
     }
   }
 
-  // Generic fallback recommendations - popular or best-selling flights
   static async getGenericRecommendations(): Promise<RecommendationResult> {
     const flights = await Flight.find({ date: { $gte: new Date() } })
       .sort({ seatsAvailable: -1 })
@@ -248,9 +238,8 @@ class RecommendationService {
     };
   }
 
-  // Predicted recommendations using external AI or pre-trained model (stub)
-  static async getPredictedRecommendations(): Promise<RecommendationResult> {
-    // Placeholder for future AI integration
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static async getPredictedTravelNeeds(_email: string): Promise<RecommendationResult | null> {
     return this.getGenericRecommendations();
   }
 }

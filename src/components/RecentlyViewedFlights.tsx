@@ -1,4 +1,3 @@
-// components/RecentlyViewedFlights.tsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
@@ -21,15 +20,34 @@ interface Props {
 const RecentlyViewedFlights: React.FC<Props> = ({ email }) => {
   const [flights, setFlights] = useState<Flight[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRecentlyViewedFlights = async () => {
       try {
-        const response = await fetch(`http://localhost:5500/api/users/recently-viewed/${email}`);
+        if (!email || typeof email !== 'string' || !email.includes('@')) {
+          throw new Error('Invalid email prop');
+        }
+        const encodedEmail = encodeURIComponent(email);
+        const url = `http://localhost:5500/api/users/recently-viewed/${encodedEmail}`;
+        console.log('Fetching flights from:', url);
+        const response = await fetch(url);
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
         const data = await response.json();
-        setFlights(data.flights || []);
+        console.log('API data:', data);
+        if (!data || !Array.isArray(data.flights)) {
+          console.warn('Invalid API response, expected flights array:', data);
+          setFlights([]);
+        } else {
+          setFlights(data.flights);
+        }
       } catch (error) {
         console.error('Error fetching recently viewed flights:', error);
+        setFlights([]);
+        setError('Failed to load flights. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -39,6 +57,7 @@ const RecentlyViewedFlights: React.FC<Props> = ({ email }) => {
       fetchRecentlyViewedFlights();
     } else {
       setLoading(false);
+      setFlights([]);
     }
   }, [email]);
 
@@ -46,8 +65,20 @@ const RecentlyViewedFlights: React.FC<Props> = ({ email }) => {
     return <div className="animate-pulse bg-gray-200 h-40 rounded-lg"></div>;
   }
 
-  if (flights.length === 0) {
-    return null;
+  if (error) {
+    return <div className="bg-white rounded-lg shadow-md p-4 mb-6 text-red-600">{error}</div>;
+  }
+
+  if (!Array.isArray(flights) || flights.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div className="flex items-center mb-4">
+          <Clock className="mr-2 text-blue-600" />
+          <h3 className="text-lg font-semibold">Recently Viewed Flights</h3>
+        </div>
+        <p className="text-gray-600">No recently viewed flights.</p>
+      </div>
+    );
   }
 
   return (
@@ -75,8 +106,8 @@ const RecentlyViewedFlights: React.FC<Props> = ({ email }) => {
                 <div>{flight.arrivalTime}</div>
               </div>
             </div>
-            <Link 
-              to={`/booking?flightId=${flight._id}`} 
+            <Link
+              to={`/booking?flightId=${encodeURIComponent(flight._id)}`}
               className="mt-3 block text-center text-sm bg-blue-600 text-white py-1 rounded hover:bg-blue-700 transition"
             >
               Book Again
@@ -88,4 +119,4 @@ const RecentlyViewedFlights: React.FC<Props> = ({ email }) => {
   );
 };
 
-export default RecentlyViewedFlights;
+export default React.memo(RecentlyViewedFlights);

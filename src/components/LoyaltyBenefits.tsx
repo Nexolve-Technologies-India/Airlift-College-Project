@@ -1,4 +1,3 @@
-// components/LoyaltyBenefits.tsx
 import React, { useEffect, useState } from 'react';
 import { Award, Star, Shield } from 'lucide-react';
 
@@ -20,20 +19,26 @@ interface Props {
 const LoyaltyBenefits: React.FC<Props> = ({ email }) => {
   const [loyaltyInfo, setLoyaltyInfo] = useState<LoyaltyInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchLoyaltyInfo = async () => {
       try {
-        const response = await fetch(`http://localhost:5500/api/users/loyalty/${email}`);
-        
+        const encodedEmail = encodeURIComponent(email);
+        const url = `http://localhost:5500/api/users/loyalty/${encodedEmail}`;
+        console.log('Fetching loyalty info from:', url);
+        const response = await fetch(url);
+        console.log('Response status:', response.status, 'OK:', response.ok);
         if (response.ok) {
           const data = await response.json();
+          console.log('Loyalty data:', data);
           setLoyaltyInfo(data);
         } else {
-          console.error('Failed to fetch loyalty info');
+          const errorData = await response.json();
+          setError(errorData.error || 'Failed to fetch loyalty info');
         }
       } catch (error) {
-        console.error('Error fetching loyalty info:', error);
+        setError('Error fetching loyalty info: ' + (error instanceof Error ? error.message : 'Unknown error'));
       } finally {
         setLoading(false);
       }
@@ -42,6 +47,7 @@ const LoyaltyBenefits: React.FC<Props> = ({ email }) => {
     if (email) {
       fetchLoyaltyInfo();
     } else {
+      setError('No email provided');
       setLoading(false);
     }
   }, [email]);
@@ -50,8 +56,20 @@ const LoyaltyBenefits: React.FC<Props> = ({ email }) => {
     return <div className="animate-pulse bg-gray-200 h-40 rounded-lg"></div>;
   }
 
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6 text-red-600">
+        <p>{error}</p>
+      </div>
+    );
+  }
+
   if (!loyaltyInfo) {
-    return null;
+    return (
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        <p>No loyalty data available</p>
+      </div>
+    );
   }
 
   const { loyaltyPoints, loyaltyTier, benefits } = loyaltyInfo;
