@@ -6,20 +6,20 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 
 // Import routes
-import flightRoutes from './routes/flightRoutes.js';
-import bookingRoutes from './routes/bookingRoutes.js';
-import chatbotRoutes from './routes/chatbotRoutes.js';
-import userRoutes from './routes/userRoutes.js';
-import feedbackRoutes from './routes/feedbackRoutes.js';
-import recommendationRoutes from './routes/recommendationRoutes.js';
-import alertRoutes from './routes/alertRoutes.js';
-import behaviorRoutes from './routes/behaviorRoutes.js';
-import loyaltyRoutes from './routes/loyaltyRoutes.js';
+import flightRoutes from './routes/flightRoutes';
+import bookingRoutes from './routes/bookingRoutes';
+import chatbotRoutes from './routes/chatbotRoutes';
+import userRoutes from './routes/userRoutes';
+import feedbackRoutes from './routes/feedbackRoutes';
+import recommendationRoutes from './routes/recommendationRoutes';
+import alertRoutes from './routes/alertRoutes';
+import behaviorRoutes from './routes/behaviorRoutes';
+import loyaltyRoutes from './routes/loyaltyRoutes';
 
 // Import NLP services
-import NLPService from './services/nlpService.js';
-import IntentClassifier from './utils/intentClassifier.js';
-import nlpConfig from './config/nlpConfig.js';
+import NLPService from './services/nlpService';
+import IntentClassifier from './utils/intentClassifier';
+import nlpConfig from './config/nlpConfig';
 
 dotenv.config();
 

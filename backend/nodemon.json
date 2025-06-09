@@ -1,5 +1,5 @@
 {
-  "watch": ["*.ts", "routes", "services", "utils", "config", "models"],
+  "watch": ["*.ts", "routes/**/*", "services/**/*", "utils/**/*", "config/**/*", "models/**/*"],
   "ext": "ts",
-  "exec": "npx ts-node --esm server.ts"
+  "exec": "tsx server.ts"
 }

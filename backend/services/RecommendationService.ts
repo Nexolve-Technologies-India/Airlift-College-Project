@@ -2,7 +2,7 @@ import User, { IUser } from '../models/User';
 import Flight from '../models/flight';
 import Booking from '../models/booking';
 import Recommendation from '../models/recommendationModel';
-import tf from '@tensorflow/tfjs-node';
+import tf from '@tensorflow/tfjs';
 import { Types } from 'mongoose';
 
 interface FlightDoc {
